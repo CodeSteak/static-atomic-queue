@@ -38,6 +38,16 @@
 //!     assert_eq!(v, 10);
 //! }
 //! ```
+//! ```rust
+//! static QUEUE: atomic_queue::Queue<usize, 23> = atomic_queue::Queue::new();
+//!
+//! fn do_stuff() {
+//!     QUEUE.push(42);
+//!     if let Some(v) = QUEUE.pop() {
+//!         assert_eq!(v, 42);
+//!     }
+//! }
+//! ```
 //!
 //! # Safety
 //! This queue implementation uses unsafe internally.
