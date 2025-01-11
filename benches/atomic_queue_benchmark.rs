@@ -24,7 +24,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("atomic_queue - push/pop", |b| {
-        let queue = atomic_queue::Queue::<u64>::new(100);
+        let queue: atomic_queue::Queue<u64, 100> = Default::default();
         b.iter(|| {
             queue.push(black_box(0));
             queue.pop()

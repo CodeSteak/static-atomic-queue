@@ -9,7 +9,7 @@ Multi-producer multi-consumer bounded lock-free queue for use in ~~Audio~~ embed
 https://github.com/max0x7ba/atomic_queue.
 
 Changes: 
-- Are buffers for the queues are now staticly allocated.
+- All buffers for the queues are now staticly allocated.
 
 ## License
 MIT

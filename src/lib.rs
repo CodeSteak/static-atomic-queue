@@ -1,3 +1,5 @@
+#![no_std]
+#![warn(missing_docs)]
 // Augmented Audio: Audio libraries and applications
 // Copyright (c) 2022 Pedro Tacla Yamada
 //
@@ -29,7 +31,7 @@
 //!
 //! # Usage
 //! ```rust
-//! let queue: atomic_queue::Queue<usize> = atomic_queue::bounded(10);
+//! let queue: atomic_queue::Queue<usize, 10> = Default::default();
 //!
 //! queue.push(10);
 //! if let Some(v) = queue.pop() {
@@ -47,12 +49,10 @@
 //! multiple producers while `ringbuf` is single producer single consumer.
 //!
 //! Testing again on a M1 Pro, it is 30% faster.
-use std::cell::UnsafeCell;
-use std::cmp::max;
-use std::mem::MaybeUninit;
-use std::sync::atomic::{AtomicI8, AtomicUsize, Ordering};
-
-#[warn(missing_docs)]
+use core::cell::UnsafeCell;
+use core::cmp::max;
+use core::mem::MaybeUninit;
+use core::sync::atomic::{AtomicI8, AtomicUsize, Ordering};
 
 /// State a slot in the Queue's circular buffer can be in.
 enum CellState {
@@ -82,41 +82,30 @@ impl From<CellState> for i8 {
 /// that can be free-ed outside of the critical path.
 ///
 /// Uses unsafe internally.
-pub struct Queue<T> {
+pub struct Queue<T, const CAPACITY: usize> {
     head: AtomicUsize,
     tail: AtomicUsize,
-    elements: Vec<UnsafeCell<MaybeUninit<T>>>,
-    states: Vec<AtomicI8>,
+    states: [AtomicI8; CAPACITY],
+    elements: [UnsafeCell<MaybeUninit<T>>; CAPACITY],
 }
 
-unsafe impl<T: Send> Send for Queue<T> {}
-unsafe impl<T: Send> Sync for Queue<T> {}
+unsafe impl<T: Send, const CAPACITY: usize> Send for Queue<T, CAPACITY> {}
+unsafe impl<T: Send, const CAPACITY: usize> Sync for Queue<T, CAPACITY> {}
 
-/// Alias for `Queue::new`, creates a new bounded `MPMC` queue with the given capacity.
-///
-/// Writes will fail if the queue is full.
-pub fn bounded<T>(capacity: usize) -> Queue<T> {
-    Queue::new(capacity)
+impl<T: Send, const CAPACITY: usize> Default for Queue<T, CAPACITY> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-impl<T> Queue<T> {
+impl<T, const CAPACITY: usize> Queue<T, CAPACITY> {
     /// Create a queue with a certain capacity. Writes will fail when the queue is full.
-    pub fn new(capacity: usize) -> Self {
-        let mut elements = Vec::with_capacity(capacity);
-        for _ in 0..capacity {
-            elements.push(UnsafeCell::new(MaybeUninit::uninit()));
-        }
-        let mut states = Vec::with_capacity(capacity);
-        for _ in 0..capacity {
-            states.push(AtomicI8::new(CellState::Empty.into()));
-        }
-        let head = AtomicUsize::new(0);
-        let tail = AtomicUsize::new(0);
+    pub const fn new() -> Self {
         Queue {
-            head,
-            tail,
-            elements,
-            states,
+            head: AtomicUsize::new(0),
+            tail: AtomicUsize::new(0),
+            states: [const { AtomicI8::new(CellState::Empty as i8) }; CAPACITY],
+            elements: [const { UnsafeCell::new(MaybeUninit::uninit()) }; CAPACITY],
         }
     }
 
@@ -208,7 +197,7 @@ impl<T> Queue<T> {
     }
 }
 
-impl<T> Queue<T> {
+impl<T, const CAPACITY: usize> Queue<T, CAPACITY> {
     fn do_pop(&self, tail: usize) -> T {
         let state = &self.states[tail % self.states.len()];
         loop {
@@ -267,9 +256,9 @@ impl<T> Queue<T> {
     }
 }
 
-impl<T> Drop for Queue<T> {
+impl<T, const CAPACITY: usize> Drop for Queue<T, CAPACITY> {
     fn drop(&mut self) {
-        if std::mem::needs_drop::<T>() {
+        if core::mem::needs_drop::<T>() {
             // Could probably be made more efficient by using [std::ptr::drop_in_place()]
             // as the &mut self here guarantees that we are the only remaining user of this Queue
             while let Some(element) = self.pop() {
@@ -281,11 +270,14 @@ impl<T> Drop for Queue<T> {
 
 #[cfg(test)]
 mod test {
+    extern crate std;
+
     use std::ffi::c_void;
     use std::sync::{Arc, Mutex};
     use std::thread;
     use std::thread::JoinHandle;
     use std::time::Duration;
+    use std::vec::Vec;
 
     use super::*;
 
@@ -300,12 +292,12 @@ mod test {
 
     #[test]
     fn test_create_bounded_queue() {
-        let _queue = Queue::<MockPtr>::new(10);
+        let _queue = Queue::<MockPtr, 10>::new();
     }
 
     #[test]
     fn test_get_empty_queue_len() {
-        let queue = Queue::<MockPtr>::new(10);
+        let queue = Queue::<MockPtr, 10>::new();
         assert_eq!(queue.len(), 0);
     }
 
@@ -320,7 +312,7 @@ mod test {
             }
         }
         let drop_count = Arc::new(AtomicUsize::new(0));
-        let queue: Queue<Item> = Queue::new(10);
+        let queue: Queue<Item, 10> = Queue::new();
         queue.push(Item {
             drop_count: drop_count.clone(),
         });
@@ -337,7 +329,7 @@ mod test {
 
     #[test]
     fn test_push_element_to_queue_increments_length() {
-        let queue = Queue::<MockPtr>::new(10);
+        let queue = Queue::<MockPtr, 10>::new();
         assert_eq!(queue.len(), 0);
         let ptr = mock_ptr(1);
         assert!(queue.push(ptr));
@@ -349,7 +341,7 @@ mod test {
 
     #[test]
     fn test_push_pop_push_pop() {
-        let queue = Queue::<MockPtr>::new(10);
+        let queue = Queue::<MockPtr, 10>::new();
         assert_eq!(queue.len(), 0);
         {
             let ptr = mock_ptr(1);
@@ -371,7 +363,7 @@ mod test {
 
     #[test]
     fn test_overflow_will_not_break_things() {
-        let queue = Queue::<MockPtr>::new(3);
+        let queue = Queue::<MockPtr, 3>::new();
         assert_eq!(queue.len(), 0);
 
         // ENTRY 1 - HEAD, ENTRY, TAIL, EMPTY, EMPTY
@@ -397,7 +389,7 @@ mod test {
     fn test_multithread_push() {
         wisual_logger::init_from_env();
 
-        let queue = Arc::new(Queue::new(50000));
+        let queue = Arc::new(Queue::<_, 50000>::new());
 
         let writer_thread_1 = spawn_writer_thread(
             10,
@@ -425,11 +417,14 @@ mod test {
     fn test_multithread_push_pop() {
         wisual_logger::init_from_env();
 
-        let size = 10000;
-        let num_threads = 5;
+        const SIZE: usize = 10000;
+        const NUM_THREADS: usize = 5;
 
-        let queue: Arc<Queue<MockPtr>> = Arc::new(Queue::new(size * num_threads / 3));
-        let output_queue: Arc<Queue<MockPtr>> = Arc::new(Queue::new(size * num_threads));
+        const QUEUE_SIZE: usize = SIZE * NUM_THREADS / 3;
+        const OUTPUT_QUEUE_SIZE: usize = SIZE * NUM_THREADS;
+
+        let queue: Arc<Queue<MockPtr, QUEUE_SIZE>> = Arc::new(Queue::new());
+        let output_queue: Arc<Queue<MockPtr, OUTPUT_QUEUE_SIZE>> = Arc::new(Queue::new());
 
         let is_running = Arc::new(Mutex::new(true));
         let reader_thread = {
@@ -451,11 +446,10 @@ mod test {
             })
         };
 
-        let threads: Vec<JoinHandle<()>> = (0..num_threads)
-            .into_iter()
+        let threads: Vec<JoinHandle<()>> = (0..NUM_THREADS)
             .map(|_| {
                 spawn_writer_thread(
-                    size,
+                    SIZE,
                     queue.clone(),
                     Duration::from_millis((rand::random::<f64>()) as u64),
                 )
@@ -473,12 +467,12 @@ mod test {
         reader_thread.join().unwrap();
 
         assert_eq!(queue.len(), 0);
-        assert_eq!(output_queue.len(), size * num_threads);
+        assert_eq!(output_queue.len(), SIZE * NUM_THREADS);
     }
 
-    fn spawn_writer_thread(
+    fn spawn_writer_thread<const CAPACITY: usize>(
         size: usize,
-        queue: Arc<Queue<MockPtr>>,
+        queue: Arc<Queue<MockPtr, CAPACITY>>,
         duration: Duration,
     ) -> JoinHandle<()> {
         thread::spawn(move || {
