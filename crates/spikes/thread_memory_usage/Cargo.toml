@@ -1,6 +1,0 @@
-[package]
-name = "thread_memory_usage"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]

@@ -1,105 +1,24 @@
-[workspace]
-resolver = "2"
-members = [
-    # Applications & Plug-ins
-    "crates/apps/looper/augmented-codegen",
-    "crates/apps/looper/looper-processor",
-    "crates/apps/looper/looper-vst",
-    "crates/apps/plugin-host/plugin-host-cli",
-    "crates/apps/plugin-host/plugin-host-gui2",
-    "crates/apps/plugin-host/plugin-host-lib",
-    "crates/apps/synth",
-    "crates/apps/tremolo-plugin",
-    "crates/apps/demo-plugin",
-    "crates/apps/metronome/rust",
-    # Examples
-    "crates/examples/host-tempo-plugin",
-    # Repository scripts
-    "crates/scripts/autosync-submodules",
-    "crates/scripts/midi-logger-host",
-    # Augmented framework
-    "crates/augmented/augmented",
-    # Augmented components
-    "crates/augmented/application/actix-system-threads",
-    "crates/augmented/application/audio-processor-standalone",
-    "crates/augmented/application/audio-processor-standalone-gui",
-    "crates/augmented/application/audio-processor-standalone-midi",
-    "crates/augmented/application/audio-processor-standalone-osc",
-    "crates/augmented/audio/adsr-envelope",
-    "crates/augmented/audio/audio-garbage-collector",
-    "crates/augmented/audio/audio-garbage-collector-v2",
-    "crates/augmented/audio/audio-parameter-store",
-    "crates/augmented/audio/audio-processor-analysis",
-    "crates/augmented/audio/audio-processor-bitcrusher",
-    "crates/augmented/audio/audio-processor-dynamics",
-    "crates/augmented/audio/audio-processor-file",
-    "crates/augmented/audio/audio-processor-graph",
-    "crates/augmented/audio/audio-processor-metronome",
-    "crates/augmented/audio/audio-processor-pitch-shifter",
-    "crates/augmented/audio/audio-processor-time",
-    "crates/augmented/audio/audio-processor-traits",
-    "crates/augmented/audio/audio-processor-traits-derive",
-    "crates/augmented/audio/audio-processor-utility",
-    "crates/augmented/audio/audiounit",
-    "crates/augmented/audio/audio-thread-logger",
-    "crates/augmented/audio/augmented-longbackoff",
-    "crates/augmented/audio/augmented-streams",
-    "crates/augmented/audio/oscillator",
-    "crates/augmented/data/atomic-queue",
-    "crates/augmented/data/atomics",
-    "crates/augmented/data/audio-volume",
-    "crates/augmented/data/augmented-midi",
-    "crates/augmented/data/augmented-playhead",
-    "crates/augmented/data/circular-data-structures",
-    "crates/augmented/development/augmented-dev-cli",
-    "crates/augmented/development/audio-compare",
-    "crates/augmented/development/bundler",
-    "crates/augmented/dsp/convert-sample-rate",
-    "crates/augmented/dsp/dsp-filters",
-    "crates/augmented/gui/audio-processor-iced-design-system",
-    "crates/augmented/gui/audio-processor-iced-storybook",
-    "crates/augmented/gui/audio-settings-gui",
-    "crates/augmented/gui/augmented-audio-gui-basics",
-    "crates/augmented/gui/augmented-audio-knob",
-    "crates/augmented/gui/augmented-audio-wave",
-    "crates/augmented/gui/darwin-webkit",
-    "crates/augmented/gui/generic-parameters-editor",
-    "crates/augmented/gui/iced-editor",
-    "crates/augmented/gui/macos-bundle-resources",
-    "crates/augmented/gui/webview-holder",
-    "crates/augmented/gui/webview-transport",
-    "crates/augmented/ops/audio-plugin-logger",
-    "crates/augmented/ops/augmented-analytics",
-    "crates/augmented/ops/augmented-metrics",
-    "crates/augmented/ops/wisual-logger",
-]
+[package]
+name = "atomic-queue"
+description = "Simple bounded lock-free queue for use in Audio applications, ported from https://github.com/max0x7ba/atomic_queue."
+license = "MIT"
+homepage = "https://github.com/yamadapc/augmented-audio"
+repository = "https://github.com/yamadapc/augmented-audio"
+version = "2.2.0"
+edition = "2018"
 
-exclude = [
-  "crates/augmented",
-  "crates/apps",
-  "crates/augmented/gui/darwin-webkit",
-  "crates/libloading",
-  "crates/scripts",
-  "crates/spikes",
-  "crates/vendor",
-]
+[dependencies]
 
-[profile.bench]
-debug = true
+[dev-dependencies]
+log = "^0.4.14"
+wisual-logger = { version = "0.1", path = "../../ops/wisual-logger" }
+rand = "^0.8.4"
+criterion = "0.4"
+ringbuf = "^0.2.6"
 
-[patch."https://github.com/yamadapc/baseview"]
-augmented_baseview = { path = "crates/vendor/baseview" }
+[[bench]]
+name = "atomic_queue_benchmark"
+harness = false
 
-[patch."https://github.com/yamadapc/iced_baseview"]
-augmented_iced_baseview = { path = "crates/vendor/iced-baseview" }
-
-[patch.crates-io]
-wisual-logger = { version = "0.1", path = "crates/augmented/ops/wisual-logger" }
-
-# Vendor overrides
-# iced = { version = "^0.3.0", path = "crates/vendor/iced" }
-# cpal = { path = "crates/vendor/cpal" }
-coreaudio-rs = { path = "crates/vendor/coreaudio-rs" }
-vst = { path = "crates/vendor/vst" }
-libsamplerate-sys = { path = "crates/vendor/libsamplerate-sys" }
-assert_no_alloc = { version = "1.1.2", path = "crates/vendor/assert-no-alloc" }
+[package.metadata.augmented]
+private = false
